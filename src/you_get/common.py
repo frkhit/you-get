@@ -5,7 +5,6 @@ import os
 import re
 import sys
 import time
-import json
 import socket
 import locale
 import logging
@@ -727,7 +726,12 @@ def url_save(
     if os.access(filepath, os.W_OK):
         # on Windows rename could fail if destination filepath exists
         os.remove(filepath)
-    os.rename(temp_filepath, filepath)
+
+    # todo 文件名编码问题导致重命名错误： 暂时不处理此错误
+    try:
+        os.rename(temp_filepath, filepath)
+    except FileNotFoundError as e:
+        print(e)
 
 
 class SimpleProgressBar:

@@ -37,6 +37,8 @@ class YouTube(VideoExtractor):
         {'itag': '17', 'container': '3GP', 'video_resolution': '144p', 'video_encoding': 'MPEG-4 Visual', 'video_profile': 'Simple', 'video_bitrate': '0.05', 'audio_encoding': 'AAC', 'audio_bitrate': '24'},
     ]
 
+    _download_log = None
+
     def decipher(js, s):
         def tr_js(code):
             code = re.sub(r'function', r'def', code)
@@ -126,10 +128,22 @@ class YouTube(VideoExtractor):
 
         self.title = re.search(r'<meta name="title" content="([^"]+)"', video_page).group(1)
         self.p_playlist()
+
+        self._download_log = PlaylistTaskLog(task_id=playlist_id)
         for video in videos:
             vid = parse_query_param(video, 'v')
             index = parse_query_param(video, 'index')
-            self.__class__().download_by_url(self.__class__.get_url_from_vid(vid), index=index, **kwargs)
+            self._download_log.add_task(video_id=vid, video_index=index)
+
+        for task in self._download_log:
+            vid = task["vid"]
+            index = task["index"]
+            try:
+                self.__class__().download_by_url(self.__class__.get_url_from_vid(vid), index=index, **kwargs)
+                self._download_log.commit(video_id=vid, success=True)
+            except Exception as e:
+                log.e(e)
+                self._download_log.commit(video_id=vid, success=False)
 
     def prepare(self, **kwargs):
         assert self.url or self.vid

@@ -1629,12 +1629,13 @@ def main(**kwargs):
 
 
 class PlaylistTaskLog(object):
-    def __init__(self, task_id, tmp_path=None):
+    def __init__(self, task_id, tmp_path=None, max_retry_count=5):
         self._task_id = task_id
         self._log = {}
         self._tmp_path = tmp_path or tempfile.gettempdir()
-        self._log_file = os.path.join(tmp_path, "{}.pkl".format(self._task_id))
-
+        self._log_file = os.path.join(self._tmp_path, "{}.pkl".format(self._task_id))
+        self._max_retry_count = max_retry_count
+        self._pkl_exists_before = False
         # init log
         self._init_log()
 
@@ -1642,10 +1643,12 @@ class PlaylistTaskLog(object):
         if not os.path.exists(self._log_file):
             with open(self._log_file, "w"):
                 pass
+            self._pkl_exists_before = False
             return
 
         with open(self._log_file, "r") as f:
             self._log = json.load(f)
+            self._pkl_exists_before = True
             return
 
     def _update_config(self):
@@ -1667,7 +1670,7 @@ class PlaylistTaskLog(object):
             if not self._log:
                 return None
 
-            sorted_list = sorted(self._log.keys(), key=lambda x: x[1]["count"])
+            sorted_list = sorted(self._log.keys(), key=lambda x: self._log[x]["count"])
 
             return self._log[sorted_list[0]]
 
@@ -1677,7 +1680,7 @@ class PlaylistTaskLog(object):
             if task is None:
                 raise StopIteration
 
-            yield task
+            return task
 
     next = __next__  # python 2
 
@@ -1690,14 +1693,18 @@ class PlaylistTaskLog(object):
             self._log.pop(video_id)
         else:
             self._log[video_id]["count"] += 1
+            if self._log[video_id]["count"] > self._max_retry_count:
+                self._log.pop(video_id)
 
         self._update_config()
+        log.d("[DEBUG] PlaylistTaskLog[{} left] is {}".format(len(self._log), self._log))
 
     def add_task(self, video_id, video_index=0):
-        self._log[video_id] = {
-            "count": 0,
-            "vid": video_id,
-            "index": video_index
-        }
+        if not self._pkl_exists_before and video_id not in self._log:
+            self._log[video_id] = {
+                "count": 0,
+                "vid": video_id,
+                "index": video_index
+            }
 
-        self._update_config()
+            self._update_config()

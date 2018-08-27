@@ -141,8 +141,7 @@ class YouTube(VideoExtractor):
             try:
                 self.__class__().download_by_url(self.__class__.get_url_from_vid(vid), index=index, **kwargs)
                 self._download_log.commit(video_id=vid, success=True)
-            except Exception as e:
-                log.e(e)
+            except:
                 self._download_log.commit(video_id=vid, success=False)
 
     def prepare(self, **kwargs):
